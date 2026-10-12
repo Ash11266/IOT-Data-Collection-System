@@ -1,0 +1,95 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: iot_data
+      POSTGRES_USER: iot_user
+      POSTGRES_PASSWORD: iot_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ./sql/init.sql
+        target: /docker-entrypoint-initdb.d/init.sql
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U iot_user -d iot_data" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+
+  simulator:
+    build: .
+    command: [ "python", "src/simulator.py" ]
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      MODBUS_HOST: modbus-server
+      MODBUS_PORT: "5020"
+      SIM_INTERVAL_SECONDS: "1"
+      MAX_ROWS: "0"
+    volumes:
+      - ./data:/app/data:ro
+    depends_on:
+      - mosquitto
+      - modbus-server
+    restart: "no"
+
+  mqtt-subscriber:
+    build: .
+    command: [ "python", "src/mqtt_subscriber.py" ]
+    environment:
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "1883"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: iot_data
+      DB_USER: iot_user
+      DB_PASSWORD: iot_dev_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mosquitto:
+        condition: service_started
+    restart: unless-stopped
+
+  modbus-server:
+    build: .
+    command: [ "python", "src/modbus_server.py" ]
+    ports:
+      - "5020:5020"
+    restart: unless-stopped
+
+  modbus-poller:
+    build: .
+    command: [ "python", "src/modbus_poller.py" ]
+    environment:
+      MODBUS_HOST: modbus-server
+      MODBUS_PORT: "5020"
+      MODBUS_POLL_INTERVAL: "2"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: iot_data
+      DB_USER: iot_user
+      DB_PASSWORD: iot_dev_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+      modbus-server:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,0 +1,4 @@
+
+paho-mqtt
+psycopg[binary]
+pymodbus==3.8.6
