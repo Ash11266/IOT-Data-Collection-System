@@ -367,4 +367,4 @@ Ensure host ports are not occupied by other local services before starting Docke
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE) (or specify your organization's license). Ensure compliance with the dataset's licensing terms before redistributing `data/pv_dataset.csv`.
+This project is licensed under the [MIT License] (or specify your organization's license). Ensure compliance with the dataset's licensing terms before redistributing `data/pv_dataset.csv`.
